@@ -4,6 +4,10 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Laravel\Socialite\Facades\Socialite;
+use App\Models\User;
+use Str;
+use Auth;
+use Hash;
 
 class SocialiteController extends Controller
 {
@@ -14,17 +18,17 @@ class SocialiteController extends Controller
 
     public function callbackSocial(Request $request, string $provider)
     {
-        $response = Socialite::driver($provider)->user();
-        $user = User::firstOrCreate(
+        $response = Socialite::driver($provider)->stateless()->user();
+        $user = User::updateOrCreate(
             ['email' => $response->getEmail()],
-            ['password' => Str::password()]
+            [
+                'name' => $response->getName() ?? $response->getNickname(),
+                'google_id' => $provider == "google" ? $response->getId() : null,
+                'facebook_id' => $provider == "facebook" ? $response->getId() : null,
+                'github_id' => $provider == "github" ? $response->getId() : null,
+                'password' => Hash::make(Str::password()),
+            ]
         );
-        $data = [$provider . '_id' => $response->getId()];
-        if ($user->wasRecentlyCreated) {
-            $data['name'] = $response->getName() ?? $response->getNickname();
-            // event(new Registered($user));
-        }
-        $user->update($data);
         Auth::login($user, remember: true);
         return to_route('welcome');
     }
